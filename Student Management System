@@ -1,0 +1,361 @@
+import java.io.*;
+import java.util.ArrayList;
+import java.util.InputMismatchException;
+import java.util.List;
+import java.util.Scanner;
+
+// 1. Student Class
+/**
+ * Represents an individual student with basic details.
+ */
+class Student implements Serializable {
+    private static final long serialVersionUID = 1L; // Recommended for Serializable
+    private String name;
+    private int rollNumber;
+    private String grade;
+    private String contactEmail;
+
+    public Student(String name, int rollNumber, String grade, String contactEmail) {
+        this.name = name;
+        this.rollNumber = rollNumber;
+        this.grade = grade;
+        this.contactEmail = contactEmail;
+    }
+
+    // Getters
+    public String getName() { return name; }
+    public int getRollNumber() { return rollNumber; }
+    public String getGrade() { return grade; }
+    public String getContactEmail() { return contactEmail; }
+
+    // Setters (Needed for editing)
+    public void setName(String name) { this.name = name; }
+    public void setGrade(String grade) { this.grade = grade; }
+    public void setContactEmail(String contactEmail) { this.contactEmail = contactEmail; }
+
+    @Override
+    public String toString() {
+        return String.format("| %-5d | %-20s | %-5s | %-25s |", 
+            rollNumber, name, grade, contactEmail);
+    }
+}
+
+// 2 & 4. StudentManagementSystem Class
+/**
+ * Manages the collection of students and handles file I/O.
+ */
+class StudentManagementSystem {
+    private List<Student> students;
+    private static final String DATA_FILE = "students.dat";
+
+    public StudentManagementSystem() {
+        // 4. Read data on startup
+        this.students = readStudentData();
+    }
+
+    // 4. Implement methods to read and write student data (Persistence)
+
+    // Write all student data to the file
+    private void writeStudentData() {
+        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(DATA_FILE))) {
+            oos.writeObject(students);
+            System.out.println("\n✅ Data saved successfully!");
+        } catch (IOException e) {
+            System.err.println("\n❌ Error writing student data to file: " + e.getMessage());
+        }
+    }
+
+    // Read student data from the file
+    // The @SuppressWarnings annotation is moved here to address the 'unchecked cast' warning
+    @SuppressWarnings("unchecked") 
+    private List<Student> readStudentData() {
+        File file = new File(DATA_FILE);
+        if (!file.exists() || file.length() == 0) {
+            return new ArrayList<>(); // Return empty list if file doesn't exist or is empty
+        }
+        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(DATA_FILE))) {
+            // This is the line that causes the unchecked warning, now suppressed locally
+            return (List<Student>) ois.readObject(); 
+        } catch (FileNotFoundException e) {
+            System.err.println("\nFile not found, starting with empty list.");
+            return new ArrayList<>();
+        } catch (IOException | ClassNotFoundException e) {
+            System.err.println("\n❌ Error reading student data. Starting with empty list. " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    // Management Methods (Part of requirement 2)
+
+    // Add a new student
+    public void addStudent(Student student) {
+        if (students.stream().anyMatch(s -> s.getRollNumber() == student.getRollNumber())) {
+            System.out.println("\n❌ Error: Student with Roll Number " + student.getRollNumber() + " already exists.");
+            return;
+        }
+        students.add(student);
+        System.out.println("\n✅ Student added successfully!");
+        writeStudentData();
+    }
+
+    // Remove a student by roll number
+    public boolean removeStudent(int rollNumber) {
+        boolean removed = students.removeIf(student -> student.getRollNumber() == rollNumber);
+        if (removed) {
+            System.out.println("\n✅ Student with Roll Number " + rollNumber + " removed successfully!");
+            writeStudentData();
+        } else {
+            System.out.println("\n❌ Error: Student with Roll Number " + rollNumber + " not found.");
+        }
+        return removed;
+    }
+
+    // Search for a student by roll number
+    public Student searchStudent(int rollNumber) {
+        return students.stream()
+            .filter(student -> student.getRollNumber() == rollNumber)
+            .findFirst()
+            .orElse(null);
+    }
+
+    // Edit a student's information
+    public boolean editStudent(int rollNumber, String newName, String newGrade, String newEmail) {
+        Student student = searchStudent(rollNumber);
+        if (student != null) {
+            student.setName(newName);
+            student.setGrade(newGrade);
+            student.setContactEmail(newEmail);
+            System.out.println("\n✅ Student information updated successfully!");
+            writeStudentData();
+            return true;
+        } else {
+            System.out.println("\n❌ Error: Student with Roll Number " + rollNumber + " not found for editing.");
+            return false;
+        }
+    }
+
+    // Display all students
+    public void displayAllStudents() {
+        if (students.isEmpty()) {
+            System.out.println("\n--- 🧑‍🎓 Student List is Empty ---");
+            return;
+        }
+        System.out.println("\n--- 📝 All Registered Students ---");
+        System.out.println("+-------+----------------------+-------+---------------------------+");
+        System.out.println("| Roll# | Name                 | Grade | Email                     |");
+        System.out.println("+-------+----------------------+-------+---------------------------+");
+        students.forEach(System.out::println);
+        System.out.println("+-------+----------------------+-------+---------------------------+");
+    }
+}
+
+// 3, 5, & 6. Main Class (User Interface and Interaction)
+/**
+ * Main class to run the console-based Student Management System.
+ * Handles user interaction and input validation.
+ */
+public class Main {
+    private static final Scanner scanner = new Scanner(System.in);
+    private static final StudentManagementSystem sms = new StudentManagementSystem();
+
+    public static void main(String[] args) {
+        int choice = -1;
+        do {
+            displayMenu();
+            try {
+                // 6. Basic Input Validation for menu choice
+                System.out.print("Enter your choice: ");
+                choice = scanner.nextInt();
+                scanner.nextLine(); // Consume newline
+
+                switch (choice) {
+                    case 1:
+                        addStudentUI();
+                        break;
+                    case 2:
+                        removeStudentUI();
+                        break;
+                    case 3:
+                        searchStudentUI();
+                        break;
+                    case 4:
+                        editStudentUI();
+                        break;
+                    case 5:
+                        sms.displayAllStudents();
+                        break;
+                    case 0:
+                        System.out.println("\n👋 Exiting Application. Goodbye!");
+                        break;
+                    default:
+                        System.out.println("\n⚠️ Invalid choice. Please select an option between 0 and 5.");
+                }
+            } catch (InputMismatchException e) {
+                System.out.println("\n⚠️ Invalid input. Please enter a number for your choice.");
+                scanner.nextLine(); // Clear the buffer
+                choice = -1; // Reset choice to loop again
+            } catch (Exception e) {
+                System.out.println("\n❌ An unexpected error occurred: " + e.getMessage());
+            }
+        } while (choice != 0);
+    }
+
+    private static void displayMenu() {
+        System.out.println("\n\n=== 📚 Student Management System ===");
+        System.out.println("1. Add New Student");
+        System.out.println("2. Remove Student");
+        System.out.println("3. Search Student");
+        System.out.println("4. Edit Student Information");
+        System.out.println("5. Display All Students");
+        System.out.println("0. Exit");
+        System.out.println("-----------------------------------");
+    }
+
+    // --- UI Helper Methods with Validation (Requirement 6) ---
+
+    private static void addStudentUI() {
+        System.out.println("\n--- Add New Student ---");
+        
+        // 6. Name Validation
+        String name = "";
+        do {
+            System.out.print("Enter Name: ");
+            name = scanner.nextLine().trim();
+            if (name.isEmpty()) {
+                System.out.println("⚠️ Name cannot be empty.");
+            }
+        } while (name.isEmpty());
+
+        // 6. Roll Number Validation
+        int rollNumber = -1;
+        boolean validRoll = false;
+        while (!validRoll) {
+            System.out.print("Enter Roll Number (integer): ");
+            try {
+                rollNumber = scanner.nextInt();
+                scanner.nextLine(); // Consume newline
+                if (rollNumber > 0) {
+                    validRoll = true;
+                } else {
+                    System.out.println("⚠️ Roll Number must be a positive integer.");
+                }
+            } catch (InputMismatchException e) {
+                System.out.println("⚠️ Invalid input. Please enter a valid integer for Roll Number.");
+                scanner.nextLine(); // Clear the buffer
+            }
+        }
+
+        // 6. Grade Validation (simple check)
+        String grade = "";
+        do {
+            System.out.print("Enter Grade (e.g., A, B+, Pass): ");
+            grade = scanner.nextLine().trim();
+            if (grade.isEmpty()) {
+                System.out.println("⚠️ Grade cannot be empty.");
+            }
+        } while (grade.isEmpty());
+        
+        // 6. Email Validation (simple check for '@')
+        String email = "";
+        do {
+            System.out.print("Enter Contact Email: ");
+            email = scanner.nextLine().trim();
+            if (email.isEmpty() || !email.contains("@")) {
+                System.out.println("⚠️ Please enter a valid email address (must contain '@').");
+            }
+        } while (email.isEmpty() || !email.contains("@"));
+
+        Student newStudent = new Student(name, rollNumber, grade, email);
+        sms.addStudent(newStudent);
+    }
+    
+    private static void removeStudentUI() {
+        System.out.println("\n--- Remove Student ---");
+        int rollNumber = getValidRollNumber("Enter Roll Number to remove: ");
+        if (rollNumber != -1) {
+            sms.removeStudent(rollNumber);
+        }
+    }
+
+    private static void searchStudentUI() {
+        System.out.println("\n--- Search Student ---");
+        int rollNumber = getValidRollNumber("Enter Roll Number to search: ");
+        if (rollNumber != -1) {
+            Student student = sms.searchStudent(rollNumber);
+            if (student != null) {
+                System.out.println("\n✅ Student Found:");
+                System.out.println("+-------+----------------------+-------+---------------------------+");
+                System.out.println("| Roll# | Name                 | Grade | Email                     |");
+                System.out.println("+-------+----------------------+-------+---------------------------+");
+                System.out.println(student.toString());
+                System.out.println("+-------+----------------------+-------+---------------------------+");
+            } else {
+                System.out.println("\n❌ Student with Roll Number " + rollNumber + " not found.");
+            }
+        }
+    }
+
+    private static void editStudentUI() {
+        System.out.println("\n--- Edit Student Information ---");
+        int rollNumber = getValidRollNumber("Enter Roll Number of student to edit: ");
+        if (rollNumber == -1) return;
+
+        Student student = sms.searchStudent(rollNumber);
+        if (student == null) {
+            System.out.println("\n❌ Student with Roll Number " + rollNumber + " not found.");
+            return;
+        }
+
+        System.out.println("\n--- Current Details ---");
+        System.out.println("Name: " + student.getName());
+        System.out.println("Grade: " + student.getGrade());
+        System.out.println("Email: " + student.getContactEmail());
+        
+        System.out.println("\n--- Enter New Details (Leave blank to keep current value) ---");
+        
+        System.out.print("New Name (" + student.getName() + "): ");
+        String newName = scanner.nextLine().trim();
+        if (newName.isEmpty()) newName = student.getName();
+
+        System.out.print("New Grade (" + student.getGrade() + "): ");
+        String newGrade = scanner.nextLine().trim();
+        if (newGrade.isEmpty()) newGrade = student.getGrade();
+
+        // Simple Email check for editing
+        String newEmail = "";
+        do {
+            System.out.print("New Contact Email (" + student.getContactEmail() + "): ");
+            newEmail = scanner.nextLine().trim();
+            if (newEmail.isEmpty()) {
+                newEmail = student.getContactEmail(); // Keep current if left blank
+                break;
+            } else if (!newEmail.contains("@")) {
+                System.out.println("⚠️ Please enter a valid email address (must contain '@').");
+            }
+        } while (!newEmail.contains("@"));
+
+        sms.editStudent(rollNumber, newName, newGrade, newEmail);
+    }
+    
+    // Utility method for repeated Roll Number input validation
+    private static int getValidRollNumber(String prompt) {
+        int rollNumber = -1;
+        boolean valid = false;
+        while (!valid) {
+            System.out.print(prompt);
+            try {
+                rollNumber = scanner.nextInt();
+                scanner.nextLine(); // Consume newline
+                if (rollNumber > 0) {
+                    valid = true;
+                } else {
+                    System.out.println("⚠️ Roll Number must be a positive integer.");
+                }
+            } catch (InputMismatchException e) {
+                System.out.println("⚠️ Invalid input. Please enter a valid integer.");
+                scanner.nextLine(); // Clear the buffer
+            }
+        }
+        return rollNumber;
+    }
+}
